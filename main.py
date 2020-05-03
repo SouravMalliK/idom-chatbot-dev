@@ -49,14 +49,21 @@ def sessionStatus(req):
     # else:
     #     speech = 'Let me explain the objective, teaching and assessment methods'
 
-    if lookup_session_status(user):
-        speech = 'Ok ' + str(lookup_session_status(user)) + ', here is the list of idioms with the last one highlighted and performance of others displayed'
+    try:
+        is_session_started = lookup_session_status(user)
+    except Exception as e:
+        logging.info(e)
+
+    if is_session_started == True:
+        speech = 'Ok ' + user + ', here is the list of idioms with the last one highlighted and performance of others displayed'
+    elif is_session_started == False:
+        speech = 'Ok ' + user + ', let me explain the objective, teaching and assessment methods.'
     else:
-        speech = 'Let me explain the objective, teaching and assessment methods'
+        speech = 'User ' + user + ' is not registered. Please register yourself, before starting this tutorials.'
 
     logging.info('Response: %s', speech)
-
     return speech
+
 
 def lookup_session_status(user):
     if not firebase_admin._apps:
@@ -79,6 +86,7 @@ def setup_client():
     })
 
     return firestore.client()
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
