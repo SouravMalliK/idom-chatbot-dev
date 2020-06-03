@@ -1,3 +1,0 @@
-Flask
-google-cloud-firestore==1.6.2
-firebase-admin
