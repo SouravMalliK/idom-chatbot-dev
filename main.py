@@ -25,6 +25,7 @@ def webhook(request):
     except AttributeError:
         return 'json error'
 
+
     if action == 'get.session.status':
         aog = actions_on_google_response()
         fulfillmentText, current_content, current_meaning = sessionStatus(req)
@@ -33,21 +34,34 @@ def webhook(request):
             [fulfillmentText, fulfillmentText, False]
         ])
 
+        aog_additional_resp_1 = aog.simple_response([
+            ["Here a small story for you.", "Here a small story for you.", False]
+        ])
+
+        aog_additional_resp_2 = aog.simple_response([
+            [current_content.get(u'paragraphs').get(u'para_1'), current_content.get(u'paragraphs').get(u'para_1'), False]
+        ])
+
         # aog_sc = aog.suggestion_chips(current_content.get(u'items'))
-        list_title, list_arr = get_content_list(current_content)
-        list_select = aog.list_select(list_title, list_arr)
+        # list_title, list_arr = get_content_list(current_content, current_meaning)
+        # list_select = aog.build_list_select(list_title, list_arr)
+
+        basic_card = aog.basic_card(current_content.get(u'title'), current_meaning.get(u'title'),
+                                    current_meaning.get(u'paragraphs').get(u'para_1').get(u'meaning_1'),
+                                    image=[current_content.get(u'images'), current_content.get(u'title')])
 
         ff_response = fulfillment_response()
         ff_text = ff_response.fulfillment_text(fulfillmentText)
-        ff_messages = ff_response.fulfillment_messages([aog_sr, list_select])
+        ff_messages = ff_response.fulfillment_messages([aog_sr, basic_card, aog_additional_resp_1, aog_additional_resp_2])
 
         reply = ff_response.main_response(ff_text, ff_messages)
+
+
 
     elif action == 'input.welcome':
         logging.info('welcome intent')
     else:
         logging.error('Unexpected action.')
-
     return make_response(jsonify(reply))
 
 
@@ -70,25 +84,34 @@ def sessionStatus(req):
         exit(1)
 
     if is_session_started == True:
-        speech = 'Ok ' + first_name + ', here is the list of idioms we are going to discuss in this session'
+        speech = 'Ok ' + first_name + ', here is the latest idioms we are going to discuss in this session'
         current_content, current_meaning = get_content(db,user)
 
     elif is_session_started == False:
         speech = 'Ok ' + first_name + ', let me explain the objective, teaching and assessment methods.'
+        current_content, current_meaning = get_intro_content(db, user)
     else:
         speech = 'User ' + first_name + ' is not registered. Please register yourself, before starting this tutorials.'
 
     logging.info('Response: %s', speech)
     return speech, current_content, current_meaning
 
-def get_content_list(current_content):
+def get_intro_content(db, user):
+    return ""
+
+def get_content_list(current_content, current_meaning):
+
     list_title = current_content.get(u'title')
+
     list_arr = [
-        [current_content.get(u'title'), current_content.get(u'paragraphs').get(u'para_1'), ["item1", "item2"],
-         [current_content.get(u'images'), current_content.get(u'titles')]],
-        [current_content.get(u'title'), current_content.get(u'paragraphs').get(u'para_2'), ["item1", "item2"],
-         [current_content.get(u'images'), current_content.get(u'titles')]]
+        [current_meaning.get(u'title'), current_meaning.get(u'paragraphs').get(u'para_1').get(u'meaning_1'),
+         [current_meaning.get(u'title'),[current_meaning.get(u'title')]],
+         [current_content.get(u'images'), current_content.get(u'title')]],
+        [current_meaning.get(u'title'), current_meaning.get(u'paragraphs').get(u'para_2').get(u'meaning_1'),
+         [current_meaning.get(u'title'), [current_meaning.get(u'title')]],
+         [current_content.get(u'images'), current_content.get(u'title')]]
     ]
+
     return list_title, list_arr
 
 def get_content(db, user):

@@ -116,6 +116,54 @@ class actions_on_google_response():
         return response
 
     """
+       Actions on Google List response
+       @param list_title = string
+       @param list_elements = list of list response items
+       """
+
+    def build_list_select(self, list_title, list_elements):
+        # as per the actions on google response list items must be between 2 and 30
+        if len(list_elements) > 30 or len(list_elements) < 2:
+            raise Exception("List items must be two or less than 30.")
+        else:
+            # items list to store list elements
+            items_list = []
+            # iterate through the list elements list
+            for list_element in list_elements:
+                # append the items to the items_list
+                items_list.append(
+                    {
+                        # title of the list item
+                        "title": list_element[0],
+                        # description of the list item
+                        "description": list_element[1],
+                        # info aabout the list item
+                        "optionInfo": {
+                            # key of the list items, key is used as user say string
+                            "key": list_element[2][0],
+                            # synonyms are the words that can be used as a value for the option when the user types instead of selecting from the list
+                            "synonyms": list_element[2][1]
+                        },
+                        # list image
+                        "image": {
+                            # URL
+                            "imageUri": list_element[3][0],
+                            # accessibility text to be spoken
+                            "accessibilityText": list_element[3][1]
+                        }
+                    }
+                )
+
+        # return the list response
+        return {
+            "platform": self.platform,
+            "listSelect": {
+                "title": list_title,
+                "items": items_list
+            }
+        }
+
+    """
     Actions on Google List response
     @param list_title = string
     @param list_elements = list of list response items
