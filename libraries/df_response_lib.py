@@ -91,6 +91,7 @@ class actions_on_google_response():
                     "subtitle": subtitle,
                     "formattedText": formattedText,
                     "buttons": buttons_json,
+                    "imageDisplayOptions": "CROPPED",
                     "image": {
                         "imageUri": image[0],
                         "accessibilityText": image[1]
@@ -106,6 +107,7 @@ class actions_on_google_response():
                     "title": title,
                     "subtitle": subtitle,
                     "formattedText": formattedText,
+                    "imageDisplayOptions": "CROPPED",
                     "image": {
                         "imageUri": image[0],
                         "accessibilityText": image[1]

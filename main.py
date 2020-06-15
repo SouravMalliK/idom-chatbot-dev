@@ -15,7 +15,7 @@ from firebase_admin import firestore
 
 
 @app.route('/', methods=['POST'])
-def webhook(request):
+def webhook():
     req = request.get_json(silent=True, force=True)
     res = None
     logging.info('Request: ' + json.dumps(req, indent=4))
@@ -34,32 +34,58 @@ def webhook(request):
             [fulfillmentText, fulfillmentText, False]
         ])
 
-        aog_additional_resp_1 = aog.simple_response([
-            ["Here a small story for you.", "Here a small story for you.", False]
+        aog_additional_resp = aog.simple_response([
+            ["Here a small story for you. " + current_content.get(u'paragraphs').get(u'para_1'),
+             "Here a small story for you. " + current_content.get(u'paragraphs').get(u'para_1'), False]
+        ])
+        basic_card = aog.basic_card(current_content.get(u'title') ,
+                                    current_meaning.get(u'title'),
+                                    current_content.get(u'paragraphs').get(u'para_1'),
+                                    # current_meaning.get(u'paragraphs').get(u'para_1').get(u'meaning_1'),
+                                    image=[current_content.get(u'images'), current_content.get(u'title')])
+
+        ff_response = fulfillment_response()
+        ff_text = ff_response.fulfillment_text(fulfillmentText)
+        ff_messages = ff_response.fulfillment_messages([aog_sr, basic_card, aog_additional_resp])
+
+        reply = ff_response.main_response(ff_text, ff_messages)
+
+
+    elif action == 'meaning.after.all':
+        aog = actions_on_google_response()
+        fulfillmentText, current_content, current_meaning = sessionStatus(req)
+
+        aog_sr = aog.simple_response([
+            [fulfillmentText, fulfillmentText, False]
+        ])
+
+        aog_additional_resp = aog.simple_response([
+            ["Here a small story for you. " + current_content.get(u'paragraphs').get(u'para_1'),
+             "Here a small story for you. " + current_content.get(u'paragraphs').get(u'para_1'), False]
         ])
 
         aog_additional_resp_2 = aog.simple_response([
-            [current_content.get(u'paragraphs').get(u'para_1'), current_content.get(u'paragraphs').get(u'para_1'), False]
+            ["Do you know the meaning of " + current_meaning.get(u'title'),
+             "Do you know the meaning of " + current_meaning.get(u'title'), False]
         ])
 
         # aog_sc = aog.suggestion_chips(current_content.get(u'items'))
         # list_title, list_arr = get_content_list(current_content, current_meaning)
         # list_select = aog.build_list_select(list_title, list_arr)
 
-        basic_card = aog.basic_card(current_content.get(u'title'), current_meaning.get(u'title'),
-                                    current_meaning.get(u'paragraphs').get(u'para_1').get(u'meaning_1'),
+        basic_card = aog.basic_card(current_content.get(u'title'),
+                                    current_meaning.get(u'title'),
+                                    current_content.get(u'paragraphs').get(u'para_1'),
+                                    # current_meaning.get(u'paragraphs').get(u'para_1').get(u'meaning_1'),
                                     image=[current_content.get(u'images'), current_content.get(u'title')])
 
         ff_response = fulfillment_response()
         ff_text = ff_response.fulfillment_text(fulfillmentText)
-        ff_messages = ff_response.fulfillment_messages([aog_sr, basic_card, aog_additional_resp_1, aog_additional_resp_2])
+        ff_messages = ff_response.fulfillment_messages([aog_sr, basic_card, aog_additional_resp])
 
         reply = ff_response.main_response(ff_text, ff_messages)
 
-
-
-    elif action == 'input.welcome':
-        logging.info('welcome intent')
+        logging.info('meaning.after.all')
     else:
         logging.error('Unexpected action.')
     return make_response(jsonify(reply))
@@ -67,7 +93,6 @@ def webhook(request):
 
 
 def sessionStatus(req):
-    suggestion_list = []
     logging.info(req.get('queryResult').get('parameters'))
 
     result = req.get('queryResult')
@@ -84,8 +109,9 @@ def sessionStatus(req):
         exit(1)
 
     if is_session_started == True:
-        speech = 'Ok ' + first_name + ', here is the latest idioms we are going to discuss in this session'
+        speech = 'Ok ' + first_name + ', here is the latest idioms we are going to discuss in this session.'
         current_content, current_meaning = get_content(db,user)
+        update_learning_for_user(db, user)
 
     elif is_session_started == False:
         speech = 'Ok ' + first_name + ', let me explain the objective, teaching and assessment methods.'
@@ -95,6 +121,10 @@ def sessionStatus(req):
 
     logging.info('Response: %s', speech)
     return speech, current_content, current_meaning
+
+def update_learning_for_user(db, user):
+
+    return ""
 
 def get_intro_content(db, user):
     return ""
@@ -117,8 +147,8 @@ def get_content_list(current_content, current_meaning):
 def get_content(db, user):
     learning = (db.collection(u'learnings').document(user).get()).to_dict()
 
-    content_dict = db.document(learning.get(u'content_id').path).get().to_dict()
-    meaning_dict = db.document(learning.get(u'learning_status').get('last_meaning_id').path).get().to_dict()
+    content_dict = db.document(learning.get(u'current_studying_content').get(u'content_id').path).get().to_dict()
+    meaning_dict = db.document(learning.get(u'current_studying_meaning').get('meaning_id').path).get().to_dict()
 
     return content_dict, meaning_dict
 
@@ -143,4 +173,4 @@ def generate_uuid(doc_ref, id_col):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0' , port=8000)
