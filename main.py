@@ -81,9 +81,10 @@ def webhook(request):
     return make_response(jsonify(reply))
 
 
-def build_response_content(user):
+def build_response_content(user, meaning_id = None):
     """
     buid response for the user request
+    :param meaning_id: optional till now
     :param user: user name from dialogflow
     :return: response in the formate simple response & basic card
     """
@@ -97,7 +98,9 @@ def build_response_content(user):
     ])
     basic_card = aog.basic_card(current_content.get(u'title'),
                                 current_meaning.get(u'title'),
-                                current_meaning.get(u'paragraphs').get(u'para_1').get(u'meaning_1'),
+                                "Meaning: " + current_meaning.get(u'explanation').get(u'meaning') + os.linesep +
+                                "Origin: " + current_meaning.get(u'explanation').get(u'origin') + os.linesep +
+                                "Examples: " + current_meaning.get(u'explanation').get(u'examples'),
                                 image=[current_content.get(u'images'), current_content.get(u'title')])
 
     ff_response = fulfillment_response()
@@ -242,8 +245,7 @@ def get_content_list(fulfillment_text, current_content, current_meaning, meaning
     list_arr = []
 
     for meaning in meaning_list:
-        list_arr.append([meaning.get(u'title'), meaning.get(u'explanation').get(u'meaning') + os.linesep
-         + meaning.get(u'explanation').get(u'examples'),
+        list_arr.append([meaning.get(u'title'), meaning.get(u'explanation').get(u'meaning'),
          [meaning.get(u'title'), [meaning.get(u'title')]],
          [meaning.get(u'image_url'), meaning.get(u'title')]])
 
