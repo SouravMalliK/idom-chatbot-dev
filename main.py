@@ -53,34 +53,20 @@ except Exception as e:
 
 
 @app.route('/', methods=['POST'])
-def webhook():
+def webhook(request):
     req = request.get_json(silent=True, force=True)
     reply = {}
     log.debug('Request: ' + json.dumps(req, indent=4))
 
     try:
+        log.debug(req.get('queryResult').get('parameters'))
         action = req.get('queryResult').get('action')
+        user = req.get('queryResult').get('parameters').get('user-name')
 
         if action == 'get.session.status':
-            aog = actions_on_google_response()
-            fulfillment_text = session_status(req)
-
-            aog_sr = aog.simple_response([
-                [fulfillment_text, fulfillment_text, False]
-            ])
-
-            ff_response = fulfillment_response()
-            ff_text = ff_response.fulfillment_text(fulfillment_text)
-            ff_messages = ff_response.fulfillment_messages([aog_sr])
-
-            reply = ff_response.main_response(ff_text, ff_messages)
+            reply = session_status(user)
             log.debug(json.dumps(reply, indent=4))
-
         elif action == 'get.after.all.content':
-
-            log.debug(req.get('queryResult').get('parameters'))
-            user = req.get('queryResult').get('parameters').get('user-name')
-
             reply = build_response_content(user)
             log.debug(json.dumps(reply, indent=4))
         else:
@@ -123,29 +109,59 @@ def build_response_content(user):
     return reply
 
 
-def session_status(req):
+def session_status(user):
     """
     Set the session for the user and fetch user info from db
-    :param req: request receive from dialogflow
-    :return: simple response in text
+    :param user:
+    :return: action on google response object
     """
-
-    log.debug(req.get('queryResult').get('parameters'))
-
-    user = req.get('queryResult').get('parameters').get('user-name')
-
     is_session_started, first_name = lookup_users(db, user)
 
     if is_session_started == True:
         speech = 'Ok ' + first_name + ', here is the latest idioms we are going to discuss in this session.'
+        current_content, current_meaning = get_content_for_user(user)
+        reply = get_content_list(speech, current_content, current_meaning, get_meaning_list(current_content[u'content_id']))
     elif is_session_started == False:
         speech = 'Ok ' + first_name + ', let me explain the objective, teaching and assessment methods.'
+        onboarding_user(user)
+        current_content, current_meaning = get_content_for_user(user)
+        reply = get_content_list(current_content, current_meaning)
     else:
         speech = 'User ' + first_name + ' is not registered. Please register yourself, before starting this tutorials.'
+        aog = actions_on_google_response()
+        aog_sr = aog.simple_response([
+            [speech, speech, False]
+        ])
+        ff_response = fulfillment_response()
+        ff_text = ff_response.fulfillment_text(speech)
+        ff_messages = ff_response.fulfillment_messages([aog_sr])
+
+        reply = ff_response.main_response(ff_text, ff_messages)
 
     log.debug(json.dumps(speech, indent=4))
-    return speech
+    return reply
 
+def onboarding_user(user):
+    """
+    Setting the learning records for a user
+    :param user:
+    :return: return True if created a document in learing connection
+    """
+    try:
+        content, meaning = get_content_for_user(user)
+        db.collection(u'learnings').document(user).update(
+            Learning(user=user,
+                     content_id=db.document(content[u'content_id']),
+                     last_content_watched_on=firestore.SERVER_TIMESTAMP,
+                     # content_para_1=True,
+                     last_meaning_watched_on=firestore.SERVER_TIMESTAMP,
+                     meaning_id=db.document(meaning[u'meaning_id'])
+                     ).to_dict())
+    except Exception as e:
+        log.error(e)
+        return False
+
+    return True
 
 def update_learning_for_user(user, content_id, meaning_id):
     """
@@ -160,7 +176,7 @@ def update_learning_for_user(user, content_id, meaning_id):
             Learning(user=user,
                      content_id=db.document(content_id),
                      last_content_watched_on=firestore.SERVER_TIMESTAMP,
-                     content_para_1=True,
+                     # content_para_1=True,
                      last_meaning_watched_on=firestore.SERVER_TIMESTAMP,
                      meaning_id=db.document(meaning_id)
                      ).to_dict())
@@ -188,6 +204,18 @@ def get_content_for_user(user):
     meaning_dict[u'meaning_id'] = learning.get(u'current_studying_meaning').get('meaning_id').path
     return content_dict, meaning_dict
 
+def get_meaning_list(content_id):
+    """
+    Get list of meaning for a content id
+    :param user:
+    :return: list of Meaning dictionary
+    """
+    meaning_dict_list = []
+    meanings = db.document(content_id).collection(u'meaning').stream()
+    for meaning in meanings:
+        meaning_dict_list.append(meaning.to_dict())
+
+    return meaning_dict_list
 
 def lookup_users(db, user):
     user_ref = (db.collection(u'users').document(user)).get()
@@ -196,19 +224,38 @@ def lookup_users(db, user):
     return result.get(u'session_started'), result.get(u'first_name')
 
 
-def get_content_list(current_content, current_meaning):
-    list_title = current_content.get(u'title')
+def get_content_list(fulfillment_text, current_content, current_meaning, meaning_list):
+    """
+     Build List from content
+    :param fulfillment_text:
+    :param current_content:
+    :param current_meaning:
+    :param meaning_list:
+    :return:
+    """
 
-    list_arr = [
-        [current_meaning.get(u'title'), current_meaning.get(u'paragraphs').get(u'para_1').get(u'meaning_1'),
-         [current_meaning.get(u'title'), [current_meaning.get(u'title')]],
-         [current_content.get(u'images'), current_content.get(u'title')]],
-        [current_meaning.get(u'title'), current_meaning.get(u'paragraphs').get(u'para_2').get(u'meaning_1'),
-         [current_meaning.get(u'title'), [current_meaning.get(u'title')]],
-         [current_content.get(u'images'), current_content.get(u'title')]]
-    ]
+    aog = actions_on_google_response()
+    aog_sr = aog.simple_response([
+        [fulfillment_text, fulfillment_text, False]
+    ])
 
-    return list_title, list_arr
+    list_arr = []
+
+    for meaning in meaning_list:
+        list_arr.append([meaning.get(u'title'), meaning.get(u'explanation').get(u'meaning') + os.linesep
+         + meaning.get(u'explanation').get(u'examples'),
+         [meaning.get(u'title'), [meaning.get(u'title')]],
+         [meaning.get(u'image_url'), meaning.get(u'title')]])
+
+    list_select = aog.list_select(current_content[u'title'], list_arr)
+
+    ff_response = fulfillment_response()
+    ff_text = ff_response.fulfillment_text(fulfillment_text)
+    ff_messages = ff_response.fulfillment_messages([aog_sr, list_select])
+
+    reply = ff_response.main_response(ff_text, ff_messages)
+
+    return reply
 
 
 def generate_uuid(doc_ref, id_col):

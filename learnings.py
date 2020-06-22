@@ -62,22 +62,22 @@ class Learning(object):
             "current_studying_content": {
                 "last_watched_on": self.last_conent_watched_on,
                 "content_id":  self.content_id ,
-                "paragraphs": {
-                    "para_1": self.content_para_1,
-                    "para_2": self.content_para_2,
-                    "para_3": self.content_para_3,
-                    "para_4": self.content_para_4
-                }
+                # "current_status": {
+                #     "para_1": self.content_para_1,
+                #     "para_2": self.content_para_2,
+                #     "para_3": self.content_para_3,
+                #     "para_4": self.content_para_4
+                # }
             },
             "current_studying_meaning": {
                 "last_watched_on": self.last_meaning_watched_on,
                 "meaning_id": self.meaning_id,
-                "paragraphs": {
-                    "para_3": self.meaning_para_4,
-                    "para_4": self.meaning_para_3,
-                    "para_2": self.meaning_para_2,
-                    "para_1": self.meaning_para_1
-                }
+                # "paragraphs": {
+                #     "para_3": self.meaning_para_4,
+                #     "para_4": self.meaning_para_3,
+                #     "para_2": self.meaning_para_2,
+                #     "para_1": self.meaning_para_1
+                # }
             }
         }
         return db_dict
