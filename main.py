@@ -52,25 +52,26 @@ except Exception as e:
 
 
 @app.route('/', methods=['POST'])
-def webhook():
+def webhook(request):
     req = request.get_json(silent=True, force=True)
     reply = {}
     log.debug('Request: ' + json.dumps(req, indent=4))
 
     try:
-        log.debug(req.get('queryResult').get('parameters'))
-        action = req.get('queryResult').get('action')
-        user = req.get('queryResult').get('parameters').get('user-name')
-
+        log.debug(req.get(u'queryResult').get(u'parameters'))
+        action = req.get(u'queryResult').get(u'action')
+        user = req.get(u'queryResult').get(u'parameters').get(u'user-name')
+        idiom = req.get('queryResult').get('parameters').get('idioms')
         if action == 'get.session.status':
             reply = session_status(user)
             log.debug(json.dumps(reply, indent=4))
+        elif action == 'startsession.startsession-selected.option':
+            reply = build_meaning_card(get_selected_idiom_from_context(req), user)
+            log.debug(json.dumps(reply, indent=4))
         elif action == 'get.after.all.content':
-            idiom = req.get('queryResult').get('parameters').get('idioms')
             reply = build_meaning_card(idiom, user)
             log.debug(json.dumps(reply, indent=4))
         elif action == 'get.crocodile.tears.content':
-            idiom = req.get('queryResult').get('parameters').get('idioms')
             reply = build_meaning_card(idiom, user)
             log.debug(json.dumps(reply, indent=4))
         else:
@@ -84,6 +85,17 @@ def webhook():
 
     return make_response(jsonify(reply))
 
+def get_selected_idiom_from_context(req):
+    """
+    Get Output context from the request for Action Intent Option
+    :param req:
+    :return:
+    """
+    idiom = ""
+    for ctx in req.get(u'queryResult').get(u'outputContexts'):
+        if 'actions_intent_option' in ctx.get(u'name'):
+            idiom = ctx.get(u'parameters').get(u'OPTION')
+    return idiom
 
 def build_content_list(user):
     """
@@ -112,13 +124,12 @@ def build_content_list(user):
     ff_response = fulfillment_response()
     ff_text = ff_response.fulfillment_text(messag)
     ff_messages = ff_response.fulfillment_messages([aog_sr, list_select])
-
     reply = ff_response.main_response(ff_text, ff_messages)
 
     return reply
 
 
-def build_meaning_card(idiom,user=None):
+def build_meaning_card(idiom,user=None, session = None, context = None):
     """
     buid card response with list for showing idiom meaning
     :param idiom: idiom title for serching from mening collection
@@ -146,7 +157,9 @@ def build_meaning_card(idiom,user=None):
     ff_response = fulfillment_response()
     ff_text = ff_response.fulfillment_text(aog_sr)
     ff_messages = ff_response.fulfillment_messages([aog_sr, basic_card])
-    reply = ff_response.main_response(ff_text, ff_messages)
+
+    reply = ff_response.main_response(fulfillment_text = ff_text,
+                                      fulfillment_messages = ff_messages)
     # update_learning_for_user(user, current_content[u'content_id'], current_meaning[u'meaning_id'])
     log.debug(json.dumps(reply, indent=4))
     return reply

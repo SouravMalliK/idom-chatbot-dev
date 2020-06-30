@@ -497,12 +497,14 @@ class fulfillment_response():
                         "fulfillmentText": fulfillment_text['fulfillment_text'],
                         "fulfillmentMessages": fulfillment_messages['fulfillment_messages'],
                         "outputContexts": output_contexts['output_contexts'],
+                        # "outputContexts": output_contexts,
                         "followupEventInput": followup_event_input['followup_event_input']
                     }
                 else:
                     response = {
                         "fulfillmentText": fulfillment_text['fulfillment_text'],
-                        "outputContexts": output_contexts['output_contexts'],
+                        # "outputContexts": output_contexts['output_contexts'],
+                        "outputContexts": output_contexts,
                         "followupEventInput": followup_event_input['followup_event_input']
                     }
             else:
@@ -523,12 +525,14 @@ class fulfillment_response():
                     response = {
                         "fulfillmentText": fulfillment_text['fulfillment_text'],
                         "fulfillmentMessages": fulfillment_messages['fulfillment_messages'],
-                        "outputContexts": output_contexts['output_contexts']
+                        # "outputContexts": output_contexts['output_contexts']
+                        "outputContexts": output_contexts
                     }
                 else:
                     response = {
                         "fulfillmentText": fulfillment_text['fulfillment_text'],
-                        "outputContexts": output_contexts['output_contexts']
+                        # "outputContexts": output_contexts['output_contexts']
+                        "outputContexts": output_contexts
                     }
             else:
                 if fulfillment_messages is not None:
