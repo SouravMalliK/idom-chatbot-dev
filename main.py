@@ -1,11 +1,11 @@
 import json
 import os
+from logging.config import dictConfig
 
 from flask import Flask, request, make_response, jsonify
 from google.cloud import firestore
 
 from libraries.df_response_lib import *
-from logging.config import dictConfig
 
 dictConfig({
     'version': 1,
@@ -62,17 +62,18 @@ def webhook(request):
         action = req.get(u'queryResult').get(u'action')
         user = req.get(u'queryResult').get(u'parameters').get(u'user-name')
         idiom = req.get('queryResult').get('parameters').get('idioms')
+        out_context = req['queryResult']['outputContexts']
         if action == 'get.session.status':
-            reply = session_status(user)
+            reply = session_status(user, out_context)
             log.debug(json.dumps(reply, indent=4))
         elif action == 'startsession.startsession-selected.option':
-            reply = build_meaning_card(get_selected_idiom_from_context(req), user)
+            reply = build_meaning_card(get_selected_idiom_from_context(req), user, out_context)
             log.debug(json.dumps(reply, indent=4))
         elif action == 'get.after.all.content':
-            reply = build_meaning_card(idiom, user)
+            reply = build_meaning_card(idiom, user, out_context)
             log.debug(json.dumps(reply, indent=4))
         elif action == 'get.crocodile.tears.content':
-            reply = build_meaning_card(idiom, user)
+            reply = build_meaning_card(idiom, user, out_context)
             log.debug(json.dumps(reply, indent=4))
         else:
             log.error('Unexpected action.')
@@ -85,6 +86,7 @@ def webhook(request):
 
     return make_response(jsonify(reply))
 
+
 def get_selected_idiom_from_context(req):
     """
     Get Output context from the request for Action Intent Option
@@ -92,10 +94,15 @@ def get_selected_idiom_from_context(req):
     :return:
     """
     idiom = ""
-    for ctx in req.get(u'queryResult').get(u'outputContexts'):
-        if 'actions_intent_option' in ctx.get(u'name'):
-            idiom = ctx.get(u'parameters').get(u'OPTION')
-    return idiom
+    # for ctx in req.get(u'queryResult').get(u'outputContexts'):
+    #     if 'actions_intent_option' in ctx.get(u'name'):
+    #         idiom = ctx.get(u'parameters').get(u'OPTION')
+
+    idiom_list = [ctx.get(u'parameters').get(u'OPTION') for ctx in req.get(u'queryResult').get(u'outputContexts')
+                  if 'actions_intent_option' in ctx.get(u'name')]
+
+    return req.get('queryResult').get('parameters').get('idioms') if len(idiom_list) == 0 else idiom_list[0]
+
 
 def build_content_list(user):
     """
@@ -129,7 +136,7 @@ def build_content_list(user):
     return reply
 
 
-def build_meaning_card(idiom,user=None, session = None, context = None):
+def build_meaning_card(idiom, user=None, out_context=None):
     """
     buid card response with list for showing idiom meaning
     :param idiom: idiom title for serching from mening collection
@@ -146,7 +153,6 @@ def build_meaning_card(idiom,user=None, session = None, context = None):
     if current_meaning.get(u'explanation').get(u'origin'):
         message += f"Origin: {current_meaning.get(u'explanation').get(u'origin')}. \r\n"
 
-
     aog_sr = aog.simple_response([[message, message, False]])
 
     basic_card = aog.basic_card(current_meaning.get(u'title'),
@@ -158,14 +164,15 @@ def build_meaning_card(idiom,user=None, session = None, context = None):
     ff_text = ff_response.fulfillment_text(aog_sr)
     ff_messages = ff_response.fulfillment_messages([aog_sr, basic_card])
 
-    reply = ff_response.main_response(fulfillment_text = ff_text,
-                                      fulfillment_messages = ff_messages)
+    reply = ff_response.main_response(fulfillment_text=ff_text,
+                                      fulfillment_messages=ff_messages,
+                                      output_contexts=out_context)
     # update_learning_for_user(user, current_content[u'content_id'], current_meaning[u'meaning_id'])
     log.debug(json.dumps(reply, indent=4))
     return reply
 
 
-def session_status(user):
+def session_status(user, out_context):
     """
     Set the session for the user and fetch user info from db
     :param user:
@@ -177,7 +184,7 @@ def session_status(user):
         speech = 'Ok ' + first_name + ', here is the latest idioms we are going to discuss in this session.'
         current_content, current_meaning = get_content_for_user(user)
         reply = get_content_list(speech, current_content, current_meaning,
-                                 get_meaning_list(current_content[u'content_id']))
+                                 get_meaning_list(current_content[u'content_id']), out_context)
     elif is_session_started == False:
         speech = 'Ok ' + first_name + ', let me explain the objective, teaching and assessment methods.'
         onboarding_user(user)
@@ -193,7 +200,7 @@ def session_status(user):
         ff_text = ff_response.fulfillment_text(speech)
         ff_messages = ff_response.fulfillment_messages([aog_sr])
 
-        reply = ff_response.main_response(ff_text, ff_messages)
+        reply = ff_response.main_response(ff_text, ff_messages, out_context)
 
     log.debug(json.dumps(speech, indent=4))
     return reply
@@ -299,7 +306,7 @@ def lookup_users(db, user):
     return result.get(u'session_started'), result.get(u'first_name')
 
 
-def get_content_list(fulfillment_text, current_content, current_meaning, meaning_list):
+def get_content_list(fulfillment_text, current_content, current_meaning, meaning_list, out_context=None):
     """
      Build List from content
     :param fulfillment_text:
@@ -333,7 +340,7 @@ def get_content_list(fulfillment_text, current_content, current_meaning, meaning
     ff_text = ff_response.fulfillment_text(fulfillment_text)
     ff_messages = ff_response.fulfillment_messages([aog_sr, list_select])
 
-    reply = ff_response.main_response(ff_text, ff_messages)
+    reply = ff_response.main_response(ff_text, ff_messages, out_context)
 
     return reply
 

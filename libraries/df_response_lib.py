@@ -496,8 +496,8 @@ class fulfillment_response():
                     response = {
                         "fulfillmentText": fulfillment_text['fulfillment_text'],
                         "fulfillmentMessages": fulfillment_messages['fulfillment_messages'],
-                        "outputContexts": output_contexts['output_contexts'],
-                        # "outputContexts": output_contexts,
+                        # "outputContexts": output_contexts['output_contexts'],
+                        "outputContexts": output_contexts,
                         "followupEventInput": followup_event_input['followup_event_input']
                     }
                 else:
