@@ -83,8 +83,8 @@ def webhook_after_all():
 def webhook_after_all():
     return webhook(profile['email'])
 
-@assist.action("get-meaning-crocodile-tears")
-def webhook_crocodile_tears():
+@assist.action("start.session - select option")
+def webhook_select_list():
     return webhook(profile['email'])
 
 def webhook(user):
