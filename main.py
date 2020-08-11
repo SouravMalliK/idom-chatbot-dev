@@ -6,6 +6,7 @@ from flask import Flask, request, make_response, jsonify
 from google.cloud import firestore
 
 from libraries.df_response_lib import *
+from flask_assistant import Assistant, ask, profile, sign_in
 
 dictConfig({
     'version': 1,
@@ -24,7 +25,11 @@ dictConfig({
 })
 
 app = Flask(__name__)
+app.config['INTEGRATIONS'] = ['ACTIONS_ON_GOOGLE']
+app.config['AOG_CLIENT_ID'] = os.environ.get('AOG_CLIENT_ID')
 log = app.logger
+
+
 
 import firebase_admin
 from firebase_admin import credentials
@@ -50,9 +55,39 @@ except Exception as e:
     log.info(e)
     exit(1)
 
+assist = Assistant(app=app, route="/", project_id=os.environ.get('PROJECT_ID'))
 
-@app.route('/', methods=['POST'])
-def webhook(request):
+@assist.action("Welcome Intent")
+def welcome():
+    if profile:
+        return ask(f"Welcome back {profile['given_name']}. How has been the day today? ")
+    return sign_in("To learn more about you")
+
+@assist.action("Complete-Sign-In")
+def complete_sign_in():
+    if profile:
+        return ask(f"Welcome aboard {profile['name']}, thanks for signing up!")
+    else:
+        return ask("Hope you sign up soon! Would love to get to know you!")
+
+@assist.action("start.session")
+def webhook_start_session():
+    return webhook(profile['email'])
+
+
+@assist.action("startsession.startsession-selected.option")
+def webhook_after_all():
+    return webhook(profile['email'])
+
+@assist.action("get-meaning-after-all")
+def webhook_after_all():
+    return webhook(profile['email'])
+
+@assist.action("get-meaning-crocodile-tears")
+def webhook_crocodile_tears():
+    return webhook(profile['email'])
+
+def webhook(user):
     req = request.get_json(silent=True, force=True)
     reply = {}
     log.debug('Request: ' + json.dumps(req, indent=4))
@@ -60,10 +95,10 @@ def webhook(request):
     try:
         log.debug(req.get(u'queryResult').get(u'parameters'))
         action = req.get(u'queryResult').get(u'action')
-        user = req.get(u'queryResult').get(u'parameters').get(u'user-name')
+        # user = req.get(u'queryResult').get(u'parameters').get(u'user-name')
         idiom = req.get('queryResult').get('parameters').get('idioms')
         out_context = req['queryResult']['outputContexts']
-        if action == 'get.session.status':
+        if  action == 'start.session':
             reply = session_status(user, out_context)
             log.debug(json.dumps(reply, indent=4))
         elif action == 'startsession.startsession-selected.option':
@@ -85,7 +120,7 @@ def webhook(request):
         return e
 
     return make_response(jsonify(reply))
-
+    # return reply
 
 def get_selected_idiom_from_context(req):
     """
@@ -153,7 +188,9 @@ def build_meaning_card(idiom, user=None, out_context=None):
     if current_meaning.get(u'explanation').get(u'origin'):
         message += f"Origin: {current_meaning.get(u'explanation').get(u'origin')}. \r\n"
 
-    aog_sr = aog.simple_response([[message, message, False]])
+    question = f" Do you want to take a quick quiz? "
+
+    aog_sr = aog.simple_response([[" ", message + question, True]])
 
     basic_card = aog.basic_card(current_meaning.get(u'title'),
                                 current_meaning.get(u'sub_title'),
@@ -164,7 +201,7 @@ def build_meaning_card(idiom, user=None, out_context=None):
     ff_text = ff_response.fulfillment_text(aog_sr)
     ff_messages = ff_response.fulfillment_messages([aog_sr, basic_card])
 
-    reply = ff_response.main_response(fulfillment_text=ff_text,
+    reply = ff_response.main_response(fulfillment_text= ff_text,
                                       fulfillment_messages=ff_messages,
                                       output_contexts=out_context)
     # update_learning_for_user(user, current_content[u'content_id'], current_meaning[u'meaning_id'])
@@ -182,6 +219,7 @@ def session_status(user, out_context):
 
     if is_session_started == True:
         speech = 'Ok ' + first_name + ', here is the latest idioms we are going to discuss in this session.'
+
         current_content, current_meaning = get_content_for_user(user)
         reply = get_content_list(speech, current_content, current_meaning,
                                  get_meaning_list(current_content[u'content_id']), out_context)
