@@ -36,6 +36,7 @@ from firebase_admin import credentials
 from firebase_admin import firestore
 
 from learnings import Learning
+from users import Users
 
 
 def setup_client():
@@ -66,6 +67,7 @@ def welcome():
 @assist.action("Complete-Sign-In")
 def complete_sign_in():
     if profile:
+        onboarding_user(profile['email'])
         return ask(f"Welcome aboard {profile['name']}, thanks for signing up!")
     else:
         return ask("Hope you sign up soon! Would love to get to know you!")
@@ -225,7 +227,7 @@ def session_status(user, out_context):
                                  get_meaning_list(current_content[u'content_id']), out_context)
     elif is_session_started == False:
         speech = 'Ok ' + first_name + ', let me explain the objective, teaching and assessment methods.'
-        onboarding_user(user)
+        # onboarding_user(user)
         current_content, current_meaning = get_content_for_user(user)
         reply = get_content_list(current_content, current_meaning)
     else:
@@ -246,20 +248,21 @@ def session_status(user, out_context):
 
 def onboarding_user(user):
     """
-    Setting the learning records for a user
+    Setting the User records from Google account linking
     :param user:
-    :return: return True if created a document in learing connection
+    :return: return True if created a document in Users connection
     """
     try:
-        content, meaning = get_content_for_user(user)
-        db.collection(u'learnings').document(user).update(
-            Learning(user=user,
-                     content_id=db.document(content[u'content_id']),
-                     last_content_watched_on=firestore.SERVER_TIMESTAMP,
-                     # content_para_1=True,
-                     last_meaning_watched_on=firestore.SERVER_TIMESTAMP,
-                     meaning_id=db.document(meaning[u'meaning_id'])
-                     ).to_dict())
+
+        db.collection(u'users').document(user).add(
+                Users(user_id=user,
+                     first_name = profile['given_name'],
+                     last_name = profile['family_name'],
+                     session_started = False,
+                     last_login=firestore.SERVER_TIMESTAMP,
+                     user_created = firestore.SERVER_TIMESTAMP,
+                     locale=profile['locale'])
+                    .to_dict())
     except Exception as e:
         log.error(e)
         return False
