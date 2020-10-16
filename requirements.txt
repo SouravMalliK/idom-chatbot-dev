@@ -19,3 +19,8 @@ ruamel.yaml==0.15.81
 six==1.12.0
 urllib3==1.24.3
 werkzeug==0.15.3
+fuzzywuzzy==0.18.0
+language-tool-python==2.4.5
+nltk==3.2.5
+pyspellchecker==0.5.5
+twython==3.8.2
